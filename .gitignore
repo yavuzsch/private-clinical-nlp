@@ -1,0 +1,7 @@
+data/raw/
+data/processed/
+data/split/
+
+__pycache__/
+*.pyc
+*.pkl
