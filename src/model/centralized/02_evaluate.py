@@ -11,6 +11,9 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
     accuracy_score,
+    precision_score,
+    recall_score,
+    hamming_loss,
     classification_report,
 )
 import torch
@@ -65,7 +68,13 @@ labels = predictions.label_ids
 
 # compute metrics
 f1_macro = f1_score(labels, preds, average='macro', zero_division=0)
+f1_micro = f1_score(labels, preds, average='micro', zero_division=0)
 f1_weighted = f1_score(labels, preds, average='weighted', zero_division=0)
+precision_macro = precision_score(labels, preds, average='macro', zero_division=0)
+precision_micro = precision_score(labels, preds, average='micro', zero_division=0)
+recall_macro = recall_score(labels, preds, average='macro', zero_division=0)
+recall_micro = recall_score(labels, preds, average='micro', zero_division=0)
+hamming = hamming_loss(labels, preds)
 accuracy = accuracy_score(labels, preds)
 
 try:
@@ -73,11 +82,17 @@ try:
 except ValueError:
     auc = 0.0
 
-print(f'test results:')
-print(f'  f1_macro : {f1_macro:.4f}')
-print(f'  f1_weighted : {f1_weighted:.4f}')
-print(f'  accuracy : {accuracy:.4f}')
-print(f'  auc : {auc:.4f}')
+print('test results:')
+print(f'f1_macro: {f1_macro:.4f}')
+print(f'f1_micro: {f1_micro:.4f}')
+print(f'f1_weighted: {f1_weighted:.4f}')
+print(f'precision_macro: {precision_macro:.4f}')
+print(f'precision_micro: {precision_micro:.4f}')
+print(f'recall_macro: {recall_macro:.4f}')
+print(f'recall_micro: {recall_micro:.4f}')
+print(f'hamming_loss: {hamming:.4f}')
+print(f'accuracy: {accuracy:.4f}')
+print(f'auc: {auc:.4f}')
 
 
 # per-class report
@@ -91,7 +106,13 @@ results = {
     'num_labels': NUM_LABELS,
     'test': {
         'f1_macro': f1_macro,
+        'f1_micro': f1_micro,
         'f1_weighted': f1_weighted,
+        'precision_macro': precision_macro,
+        'precision_micro': precision_micro,
+        'recall_macro': recall_macro,
+        'recall_micro': recall_micro,
+        'hamming_loss': hamming,
         'accuracy': accuracy,
         'auc': auc,
     }

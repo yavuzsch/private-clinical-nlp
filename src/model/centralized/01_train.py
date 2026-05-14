@@ -12,6 +12,9 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
     accuracy_score,
+    precision_score,
+    recall_score,
+    hamming_loss,
 )
 import torch
 
@@ -67,7 +70,13 @@ def compute_metrics(eval_pred):
     preds = (probs >= 0.5).astype(int)
 
     f1_macro = f1_score(labels, preds, average='macro', zero_division=0)
+    f1_micro = f1_score(labels, preds, average='micro', zero_division=0)
     f1_weighted = f1_score(labels, preds, average='weighted', zero_division=0)
+    precision_macro = precision_score(labels, preds, average='macro', zero_division=0)
+    precision_micro = precision_score(labels, preds, average='micro', zero_division=0)
+    recall_macro = recall_score(labels, preds, average='macro', zero_division=0)
+    recall_micro = recall_score(labels, preds, average='micro', zero_division=0)
+    hamming = hamming_loss(labels, preds)
     accuracy = accuracy_score(labels, preds)
 
     try:
@@ -77,7 +86,13 @@ def compute_metrics(eval_pred):
 
     return {
         'f1_macro': f1_macro,
+        'f1_micro': f1_micro,
         'f1_weighted': f1_weighted,
+        'precision_macro': precision_macro,
+        'precision_micro': precision_micro,
+        'recall_macro': recall_macro,
+        'recall_micro': recall_micro,
+        'hamming_loss': hamming,
         'accuracy': accuracy,
         'auc': auc,
     }
