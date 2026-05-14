@@ -1,9 +1,18 @@
+# data
 data/**
 !data/README.md
 
+# models
 models/**
 !models/README.md
 
+# python
 __pycache__/
 *.pyc
 *.pkl
+
+# misc
+**/tmp/
+*.log
+wandb/
+.env
