@@ -17,6 +17,7 @@ from sklearn.metrics import (
     classification_report,
 )
 import torch
+import tempfile
 
 
 # arguments
@@ -57,7 +58,7 @@ model = AutoModelForSequenceClassification.from_pretrained(str(MODEL_DIR/'best_m
 print('running inference...')
 trainer = Trainer(
     model=model,
-    args=TrainingArguments(output_dir=str(MODEL_DIR/'tmp'), report_to='none'),
+    args=TrainingArguments(output_dir=tempfile.mkdtemp(), report_to='none'),
 )
 predictions = trainer.predict(test_ds)
 
