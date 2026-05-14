@@ -118,6 +118,7 @@ class ClinicalClient(fl.client.NumPyClient):
 
 def get_client_fn(model_name, learning_rate, batch_size, local_epochs):
     model_slug = model_name.replace('/', '_')
+
     def client_fn(context):
         hospital_id = int(context.node_id) % 10
         return ClinicalClient(
@@ -128,4 +129,5 @@ def get_client_fn(model_name, learning_rate, batch_size, local_epochs):
             batch_size=batch_size,
             local_epochs=local_epochs,
         ).to_client()
+    
     return client_fn
