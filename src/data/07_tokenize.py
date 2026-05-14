@@ -129,5 +129,5 @@ with open(global_out/'label_info.json', 'w') as f:
         'categories': ALL_CATEGORIES,
     }, f, indent=2)
 
-print(f'\ntokenized.')
+print('\ntokenized.')
 print(f'num labels: {NUM_LABELS}')

@@ -119,4 +119,5 @@ results = {
 }
 with open(MODEL_DIR/'test_results.json', 'w') as f:
     json.dump(results, f, indent=2)
-print(f'done.')
+
+print('done.')
