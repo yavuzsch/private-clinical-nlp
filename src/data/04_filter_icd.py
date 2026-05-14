@@ -68,7 +68,6 @@ df['ICD_CATEGORIES'] = df['ICD9_CODE'].fillna('').apply(codes_to_categories)
 # count frequencies
 all_cats = [c for cats in df['ICD_CATEGORIES'] for c in cats]
 cat_freq = Counter(all_cats)
-
 print('total categories:', len(cat_freq))
 
 

@@ -14,7 +14,6 @@ notes = pd.read_csv(
     usecols=['SUBJECT_ID', 'HADM_ID', 'CATEGORY', 'ISERROR', 'TEXT'],
     low_memory=False
 )
-
 notes = notes[notes['CATEGORY'] == 'Discharge summary']
 notes = notes[notes['ISERROR'].isna() | (notes['ISERROR'] != 1)]
 notes = notes[['SUBJECT_ID', 'HADM_ID', 'TEXT']].copy()
