@@ -3,7 +3,6 @@ from pathlib import Path
 from transformers import AutoModelForSequenceClassification
 from sklearn.metrics import f1_score, roc_auc_score
 import torch
-import flwr as fl
 import numpy as np
 from datasets import load_from_disk
 from torch.utils.data import DataLoader
@@ -76,17 +75,3 @@ def get_evaluate_fn(model_name, model_slug):
         return avg_loss, {'f1_macro': f1_macro, 'auc': auc}
 
     return evaluate_fn
-
-
-def get_strategy(model_name, model_slug):
-    evaluate_fn = get_evaluate_fn(model_name, model_slug)
-
-    strategy = fl.server.strategy.FedAvg(
-        fraction_fit=1.0,
-        fraction_evaluate=0.0,
-        min_fit_clients=10,
-        min_available_clients=10,
-        evaluate_fn=evaluate_fn,
-    )
-
-    return strategy

@@ -5,7 +5,6 @@ import importlib
 from pathlib import Path
 
 import torch
-import flwr as fl
 from transformers import AutoModelForSequenceClassification
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -13,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 client_module = importlib.import_module('01_client')
 server_module = importlib.import_module('02_server')
 
-get_client_fn = client_module.get_client_fn
-get_strategy = server_module.get_strategy
+ClinicalClient = client_module.ClinicalClient
+get_evaluate_fn = server_module.get_evaluate_fn
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -41,46 +40,101 @@ print(f'local_epochs : {args.local_epochs}')
 print(f'num_clients : {args.num_clients}')
 
 
-# load model for initial parameters
-print('loading initial model...')
+# load metadata
 with open(BASE_DIR/'data'/'processed'/'icd_category_meta.json') as f:
     meta = json.load(f)
 
-model = AutoModelForSequenceClassification.from_pretrained(
+NUM_LABELS = meta['num_labels']
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+# initialize global model
+print('loading initial model...')
+global_model = AutoModelForSequenceClassification.from_pretrained(
     args.model_name,
-    num_labels=meta['num_labels'],
+    num_labels=NUM_LABELS,
     problem_type='multi_label_classification',
-)
-initial_parameters = fl.common.ndarrays_to_parameters(
-    [val.cpu().numpy() for val in model.state_dict().values()]
-)
-del model
+).to(DEVICE)
+
+global_parameters = [val.cpu().numpy() for val in global_model.state_dict().values()]
+del global_model
 
 
-# client and strategy
-client_fn = get_client_fn(
-    model_name=args.model_name,
-    learning_rate=args.learning_rate,
-    batch_size=args.batch_size,
-    local_epochs=args.local_epochs,
-)
+# initialize clients
+print('initializing clients...')
+clients = [
+    ClinicalClient(
+        hospital_id=i,
+        model_name=args.model_name,
+        model_slug=MODEL_SLUG,
+        learning_rate=args.learning_rate,
+        batch_size=args.batch_size,
+        local_epochs=args.local_epochs,
+    )
+    for i in range(args.num_clients)
+]
 
-strategy = get_strategy(
+evaluate_fn = get_evaluate_fn(
     model_name=args.model_name,
     model_slug=MODEL_SLUG,
 )
-strategy.initial_parameters = initial_parameters
 
 
-# run simulation
+# federated simulation
 print('starting federated simulation...')
-history = fl.simulation.start_simulation(
-    client_fn=client_fn,
-    num_clients=args.num_clients,
-    config=fl.server.ServerConfig(num_rounds=args.num_rounds),
-    strategy=strategy,
-    client_resources={'num_cpus': 1, 'num_gpus': 0.5},
+history = []
+best_f1 = 0.0
+best_parameters = None
+
+for round_num in range(1, args.num_rounds + 1):
+    print(f'\nround {round_num}/{args.num_rounds}')
+
+    # local training
+    all_parameters = []
+    all_sizes = []
+
+    for client in clients:
+        parameters, size, _ = client.fit(global_parameters, {})
+        all_parameters.append(parameters)
+        all_sizes.append(size)
+
+    # fedavg
+    total = sum(all_sizes)
+    global_parameters = [
+        sum(p[i] * s / total for p, s in zip(all_parameters, all_sizes))
+        for i in range(len(global_parameters))
+    ]
+
+    # evaluate
+    loss, metrics = evaluate_fn(round_num, global_parameters, {})
+    f1_macro = metrics['f1_macro']
+    auc = metrics['auc']
+
+    history.append({
+        'round': round_num,
+        'loss': loss,
+        'f1_macro': f1_macro,
+        'auc': auc,
+    })
+
+    if f1_macro > best_f1:
+        best_f1 = f1_macro
+        best_parameters = [p.copy() for p in global_parameters]
+        print(f'new best f1_macro: {best_f1:.4f}')
+
+
+# save best model
+print('saving best model...')
+best_model = AutoModelForSequenceClassification.from_pretrained(
+    args.model_name,
+    num_labels=NUM_LABELS,
+    problem_type='multi_label_classification',
 )
+keys = list(best_model.state_dict().keys())
+state_dict = dict(zip(keys, [torch.tensor(p) for p in best_parameters]))
+best_model.load_state_dict(state_dict, strict=True)
+best_model.save_pretrained(str(RUN_DIR/'best_model'))
+print(f'best model saved. f1_macro={best_f1:.4f}')
 
 
 # save results
@@ -91,12 +145,10 @@ results = {
     'num_clients': args.num_clients,
     'learning_rate': args.learning_rate,
     'batch_size': args.batch_size,
-    'losses_distributed': history.losses_distributed,
-    'metrics_distributed': history.metrics_distributed,
-    'losses_centralized': history.losses_centralized,
-    'metrics_centralized': history.metrics_centralized,
+    'best_f1_macro': best_f1,
+    'history': history,
 }
 with open(RUN_DIR/'results.json', 'w') as f:
-    json.dump(results, f, indent=2, default=str)
+    json.dump(results, f, indent=2)
 
 print('done.')
