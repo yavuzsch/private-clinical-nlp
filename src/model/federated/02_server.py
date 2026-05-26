@@ -1,7 +1,14 @@
 import json
 from pathlib import Path
 from transformers import AutoModelForSequenceClassification
-from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.metrics import (
+    f1_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+    hamming_loss,
+    accuracy_score,
+)
 import torch
 import numpy as np
 from datasets import load_from_disk
@@ -63,6 +70,14 @@ def get_evaluate_fn(model_name, model_slug):
         all_preds = (all_probs >= 0.5).astype(int)
 
         f1_macro = f1_score(all_labels, all_preds, average='macro', zero_division=0)
+        f1_micro = f1_score(all_labels, all_preds, average='micro', zero_division=0)
+        f1_weighted = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+        precision_macro = precision_score(all_labels, all_preds, average='macro', zero_division=0)
+        precision_micro = precision_score(all_labels, all_preds, average='micro', zero_division=0)
+        recall_macro = recall_score(all_labels, all_preds, average='macro', zero_division=0)
+        recall_micro = recall_score(all_labels, all_preds, average='micro', zero_division=0)
+        hamming = hamming_loss(all_labels, all_preds)
+        accuracy = accuracy_score(all_labels, all_preds)
         avg_loss = total_loss / len(test_loader)
 
         try:
@@ -72,6 +87,17 @@ def get_evaluate_fn(model_name, model_slug):
 
         print(f'round {server_round} | loss={avg_loss:.4f} | f1_macro={f1_macro:.4f} | auc={auc:.4f}')
 
-        return avg_loss, {'f1_macro': f1_macro, 'auc': auc}
+        return avg_loss, {
+            'f1_macro': f1_macro,
+            'f1_micro': f1_micro,
+            'f1_weighted': f1_weighted,
+            'precision_macro': precision_macro,
+            'precision_micro': precision_micro,
+            'recall_macro': recall_macro,
+            'recall_micro': recall_micro,
+            'hamming_loss': hamming,
+            'accuracy': accuracy,
+            'auc': auc,
+        }
 
     return evaluate_fn
