@@ -107,18 +107,24 @@ for round_num in range(1, args.num_rounds + 1):
 
     # evaluate
     loss, metrics = evaluate_fn(round_num, global_parameters, {})
-    f1_macro = metrics['f1_macro']
-    auc = metrics['auc']
 
     history.append({
         'round': round_num,
         'loss': loss,
-        'f1_macro': f1_macro,
-        'auc': auc,
+        'f1_macro': metrics['f1_macro'],
+        'f1_micro': metrics['f1_micro'],
+        'f1_weighted': metrics['f1_weighted'],
+        'precision_macro': metrics['precision_macro'],
+        'precision_micro': metrics['precision_micro'],
+        'recall_macro': metrics['recall_macro'],
+        'recall_micro': metrics['recall_micro'],
+        'hamming_loss': metrics['hamming_loss'],
+        'accuracy': metrics['accuracy'],
+        'auc': metrics['auc'],
     })
 
-    if f1_macro > best_f1:
-        best_f1 = f1_macro
+    if metrics['f1_macro'] > best_f1:
+        best_f1 = metrics['f1_macro']
         best_parameters = [p.copy() for p in global_parameters]
         print(f'new best f1_macro: {best_f1:.4f}')
 
