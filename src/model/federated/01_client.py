@@ -19,10 +19,12 @@ with open(PROC_DIR/'icd_category_meta.json') as f:
 NUM_LABELS = meta['num_labels']
 
 
+# extract model weights as numpy arrays
 def get_parameters(model):
     return [val.cpu().numpy() for val in model.state_dict().values()]
 
 
+# load numpy arrays into model weights
 def set_parameters(model, parameters):
     keys = list(model.state_dict().keys())
     state_dict = dict(zip(keys, [torch.tensor(p) for p in parameters]))
