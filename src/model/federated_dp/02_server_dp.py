@@ -94,14 +94,15 @@ def get_evaluate_fn(model_name, model_slug):
     val_ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
     val_loader = DataLoader(val_ds, batch_size=32)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_name,
-        num_labels=NUM_LABELS,
-        problem_type='multi_label_classification',
-    ).to(DEVICE)
-
     def evaluate_fn(server_round, parameters, config):
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            num_labels=NUM_LABELS,
+            problem_type='multi_label_classification',
+        ).to(DEVICE)
         avg_loss, metrics = _run_eval(model, parameters, val_loader)
+        del model
+        torch.cuda.empty_cache()
         print(f'[val] round {server_round} | loss={avg_loss:.4f} | f1_macro={metrics["f1_macro"]:.4f} | auc={metrics["auc"]:.4f}')
         return avg_loss, metrics
 
@@ -114,14 +115,15 @@ def get_test_evaluate_fn(model_name, model_slug):
     test_ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
     test_loader = DataLoader(test_ds, batch_size=32)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_name,
-        num_labels=NUM_LABELS,
-        problem_type='multi_label_classification',
-    ).to(DEVICE)
-
     def test_evaluate_fn(parameters):
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name,
+            num_labels=NUM_LABELS,
+            problem_type='multi_label_classification',
+        ).to(DEVICE)
         avg_loss, metrics = _run_eval(model, parameters, test_loader)
+        del model
+        torch.cuda.empty_cache()
         print(f'[test] loss={avg_loss:.4f} | f1_macro={metrics["f1_macro"]:.4f} | auc={metrics["auc"]:.4f}')
         return avg_loss, metrics
 
