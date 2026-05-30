@@ -20,6 +20,18 @@ with open(PROC_DIR/'icd_category_meta.json') as f:
 NUM_LABELS = meta['num_labels']
 
 
+# extract model weights as numpy arrays
+def get_parameters(model):
+    return [val.cpu().numpy() for val in model.state_dict().values()]
+
+
+# load numpy arrays into model weights
+def set_parameters(model, parameters):
+    keys = list(model.state_dict().keys())
+    state_dict = dict(zip(keys, [torch.tensor(p) for p in parameters]))
+    model.load_state_dict(state_dict, strict=True)
+
+
 class ClinicalClientDP(fl.client.NumPyClient):
     def __init__(self, hospital_id, model_name, model_slug, learning_rate, batch_size, local_epochs, epsilon, delta, max_grad_norm):
         self.hospital_id = hospital_id
@@ -45,18 +57,16 @@ class ClinicalClientDP(fl.client.NumPyClient):
         ).to(DEVICE)
 
     def get_parameters(self, config):
-        return [val.cpu().numpy() for val in self.model.state_dict().values()]
+        return get_parameters(self.model)
 
     def fit(self, parameters, config):
-        # load global parameters
-        keys = list(self.model.state_dict().keys())
-        state_dict = dict(zip(keys, [torch.tensor(p) for p in parameters]))
-        self.model.load_state_dict(state_dict, strict=True)
+        set_parameters(self.model, parameters)
 
-        # apply privacy engine
+        # setup optimizer and loss
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate)
         loss_fn = torch.nn.BCEWithLogitsLoss()
 
+        # apply privacy engine
         privacy_engine = PrivacyEngine()
         private_model, optimizer, train_loader = privacy_engine.make_private_with_epsilon(
             module=self.model,
@@ -81,4 +91,4 @@ class ClinicalClientDP(fl.client.NumPyClient):
                 loss.backward()
                 optimizer.step()
 
-        return [val.cpu().numpy() for val in private_model._module.state_dict().values()], self.train_size, {}
+        return get_parameters(private_model._module), self.train_size, {}
