@@ -66,24 +66,7 @@ global_model = AutoModelForSequenceClassification.from_pretrained(
 
 global_parameters = [val.cpu().numpy() for val in global_model.state_dict().values()]
 del global_model
-
-
-# initialize clients
-print('initializing clients...')
-clients = [
-    ClinicalClientDP(
-        hospital_id=i,
-        model_name=args.model_name,
-        model_slug=MODEL_SLUG,
-        learning_rate=args.learning_rate,
-        batch_size=args.batch_size,
-        local_epochs=args.local_epochs,
-        epsilon=args.epsilon,
-        delta=args.delta,
-        max_grad_norm=args.max_grad_norm,
-    )
-    for i in range(args.num_clients)
-]
+torch.cuda.empty_cache()
 
 
 # evaluate functions
@@ -100,14 +83,27 @@ best_parameters = None
 for round_num in range(1, args.num_rounds + 1):
     print(f'\nround {round_num}/{args.num_rounds}')
 
-    # local training
+    # local training — clients loaded one at a time to save memory
     all_parameters = []
     all_sizes = []
 
-    for client in clients:
+    for i in range(args.num_clients):
+        client = ClinicalClientDP(
+            hospital_id=i,
+            model_name=args.model_name,
+            model_slug=MODEL_SLUG,
+            learning_rate=args.learning_rate,
+            batch_size=args.batch_size,
+            local_epochs=args.local_epochs,
+            epsilon=args.epsilon,
+            delta=args.delta,
+            max_grad_norm=args.max_grad_norm,
+        )
         parameters, size, _ = client.fit(global_parameters, {})
         all_parameters.append(parameters)
         all_sizes.append(size)
+        del client
+        torch.cuda.empty_cache()
 
     # fedavg
     total = sum(all_sizes)
