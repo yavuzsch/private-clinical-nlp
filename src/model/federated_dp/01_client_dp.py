@@ -61,6 +61,7 @@ class ClinicalClientDP(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         set_parameters(self.model, parameters)
+        self.model.train()
 
         # setup optimizer and loss
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate)
