@@ -63,8 +63,15 @@ class ClinicalClientDP(fl.client.NumPyClient):
         set_parameters(self.model, parameters)
         self.model.train()
 
+        # freeze embeddings for opacus compatibility
+        for param in self.model.bert.embeddings.parameters():
+            param.requires_grad = False
+
         # setup optimizer and loss
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.AdamW(
+            filter(lambda p: p.requires_grad, self.model.parameters()),
+            lr=self.learning_rate,
+        )
         loss_fn = torch.nn.BCEWithLogitsLoss()
 
         # apply privacy engine
