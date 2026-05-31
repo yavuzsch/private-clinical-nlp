@@ -5,6 +5,7 @@ import importlib
 from pathlib import Path
 
 import torch
+import numpy as np
 from transformers import AutoModelForSequenceClassification
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -14,6 +15,7 @@ server_module = importlib.import_module('02_server_dp')
 
 ClinicalClientDP = client_module.ClinicalClientDP
 get_evaluate_fn = server_module.get_evaluate_fn
+get_test_evaluate_fn = server_module.get_test_evaluate_fn
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -64,29 +66,12 @@ global_model = AutoModelForSequenceClassification.from_pretrained(
 
 global_parameters = [val.cpu().numpy() for val in global_model.state_dict().values()]
 del global_model
+torch.cuda.empty_cache()
 
 
-# initialize clients
-print('initializing clients...')
-clients = [
-    ClinicalClientDP(
-        hospital_id=i,
-        model_name=args.model_name,
-        model_slug=MODEL_SLUG,
-        learning_rate=args.learning_rate,
-        batch_size=args.batch_size,
-        local_epochs=args.local_epochs,
-        epsilon=args.epsilon,
-        delta=args.delta,
-        max_grad_norm=args.max_grad_norm,
-    )
-    for i in range(args.num_clients)
-]
-
-evaluate_fn = get_evaluate_fn(
-    model_name=args.model_name,
-    model_slug=MODEL_SLUG,
-)
+# evaluate functions
+evaluate_fn = get_evaluate_fn(model_name=args.model_name, model_slug=MODEL_SLUG)
+test_evaluate_fn = get_test_evaluate_fn(model_name=args.model_name, model_slug=MODEL_SLUG)
 
 
 # federated dp simulation
@@ -98,23 +83,36 @@ best_parameters = None
 for round_num in range(1, args.num_rounds + 1):
     print(f'\nround {round_num}/{args.num_rounds}')
 
-    # local training
+    # local training — clients loaded one at a time to save memory
     all_parameters = []
     all_sizes = []
 
-    for client in clients:
+    for i in range(args.num_clients):
+        client = ClinicalClientDP(
+            hospital_id=i,
+            model_name=args.model_name,
+            model_slug=MODEL_SLUG,
+            learning_rate=args.learning_rate,
+            batch_size=args.batch_size,
+            local_epochs=args.local_epochs,
+            epsilon=args.epsilon,
+            delta=args.delta,
+            max_grad_norm=args.max_grad_norm,
+        )
         parameters, size, _ = client.fit(global_parameters, {})
         all_parameters.append(parameters)
         all_sizes.append(size)
+        del client
+        torch.cuda.empty_cache()
 
     # fedavg
     total = sum(all_sizes)
     global_parameters = [
-        sum(p[i] * s / total for p, s in zip(all_parameters, all_sizes))
+        np.sum([p[i] * s / total for p, s in zip(all_parameters, all_sizes)], axis=0)
         for i in range(len(global_parameters))
     ]
 
-    # evaluate
+    # val evaluation after each round
     loss, metrics = evaluate_fn(round_num, global_parameters, {})
 
     history.append({
@@ -136,6 +134,11 @@ for round_num in range(1, args.num_rounds + 1):
         best_f1 = metrics['f1_macro']
         best_parameters = [p.copy() for p in global_parameters]
         print(f'new best f1_macro: {best_f1:.4f}')
+
+
+# test evaluation
+print('running test evaluation...')
+test_loss, test_metrics = test_evaluate_fn(best_parameters)
 
 
 # save best model
@@ -168,5 +171,27 @@ results = {
 }
 with open(RUN_DIR/'results.json', 'w') as f:
     json.dump(results, f, indent=2)
+
+test_results = {
+    'model_name': args.model_name,
+    'num_labels': NUM_LABELS,
+    'epsilon': args.epsilon,
+    'delta': args.delta,
+    'test': {
+        'test_loss': test_loss,
+        'test_f1_macro': test_metrics['f1_macro'],
+        'test_f1_micro': test_metrics['f1_micro'],
+        'test_f1_weighted': test_metrics['f1_weighted'],
+        'test_precision_macro': test_metrics['precision_macro'],
+        'test_precision_micro': test_metrics['precision_micro'],
+        'test_recall_macro': test_metrics['recall_macro'],
+        'test_recall_micro': test_metrics['recall_micro'],
+        'test_hamming_loss': test_metrics['hamming_loss'],
+        'test_accuracy': test_metrics['accuracy'],
+        'test_auc': test_metrics['auc'],
+    }
+}
+with open(RUN_DIR/'test_results.json', 'w') as f:
+    json.dump(test_results, f, indent=2)
 
 print('done.')
