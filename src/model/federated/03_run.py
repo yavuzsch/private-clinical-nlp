@@ -2,11 +2,17 @@ import sys
 import json
 import argparse
 import importlib
+import random
 from pathlib import Path
 
 import torch
 import numpy as np
 from transformers import AutoModelForSequenceClassification
+
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
+torch.cuda.manual_seed_all(42)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
