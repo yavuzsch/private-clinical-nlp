@@ -33,6 +33,7 @@ def set_parameters(model, parameters):
 
 class ClinicalClient(fl.client.NumPyClient):
     def __init__(self, hospital_id, model_name, model_slug, learning_rate, batch_size, local_epochs):
+        torch.manual_seed(42 + hospital_id)
         self.hospital_id = hospital_id
         self.learning_rate = learning_rate
         self.local_epochs = local_epochs
@@ -42,7 +43,12 @@ class ClinicalClient(fl.client.NumPyClient):
         train_ds = load_from_disk(str(hosp_dir/model_slug/'train'))
         train_ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
-        self.train_loader = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+        self.train_loader = torch.utils.data.DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            generator=torch.Generator().manual_seed(42 + hospital_id)
+        )
         self.train_size = len(train_ds)
 
         # load model
