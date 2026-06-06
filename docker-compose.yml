@@ -26,9 +26,12 @@ services:
       - HOSPITAL_ID=0
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_0_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -45,9 +48,12 @@ services:
       - HOSPITAL_ID=1
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_1_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -64,9 +70,12 @@ services:
       - HOSPITAL_ID=2
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_2_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -83,9 +92,12 @@ services:
       - HOSPITAL_ID=3
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_3_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -102,9 +114,12 @@ services:
       - HOSPITAL_ID=4
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_4_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -121,9 +136,12 @@ services:
       - HOSPITAL_ID=5
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_5_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -140,9 +158,12 @@ services:
       - HOSPITAL_ID=6
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_6_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -159,9 +180,12 @@ services:
       - HOSPITAL_ID=7
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_7_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -178,9 +202,12 @@ services:
       - HOSPITAL_ID=8
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_8_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:
@@ -197,9 +224,12 @@ services:
       - HOSPITAL_ID=9
       - EPSILON=${EPSILON:-8.0}
       - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_9_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
     volumes:
       - ./models:/app/models
       - ./data:/app/data:ro
+      - ./notes:/app/notes
     depends_on:
       - central
     networks:

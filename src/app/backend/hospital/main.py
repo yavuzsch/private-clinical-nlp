@@ -1,38 +1,88 @@
 import json
 import os
 import csv
+import uuid
 import httpx
 import torch
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from opacus import PrivacyEngine
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from jose import JWTError, jwt
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from shared.config import (
-    MODEL_NAME, MODEL_SLUG, NUM_LABELS, MODELS_DIR, PROC_DIR, SPLIT_DIR,
+    MODEL_NAME, MODEL_SLUG, NUM_LABELS, MODELS_DIR, PROC_DIR, SPLIT_DIR, NOTES_DIR,
     LOCAL_EPOCHS, BATCH_SIZE, LEARNING_RATE, MAX_GRAD_NORM, EPSILON, DELTA,
     NOTES_PER_ROUND, CENTRAL_PORT, HOSPITAL_BASE_PORT,
+    HOSPITAL_PASSWORD, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_MINUTES,
 )
 from shared.models import (
-    NoteRequest, NoteResponse,
+    NoteRequest, NoteResponse, NoteRecord, NoteUpdateRequest,
     PredictRequest, PredictResponse,
     TrainResponse, BudgetResponse,
     HospitalStatusResponse, UpdateModelRequest,
+    LoginRequest, LoginResponse,
 )
 
 
 HOSPITAL_ID = int(os.getenv('HOSPITAL_ID', '0'))
 CENTRAL_URL = f'http://central:{CENTRAL_PORT}'
+NOTES_FILE = NOTES_DIR/f'hospital_{HOSPITAL_ID}.json'
+
+security = HTTPBearer()
 
 # state
 model = None
 tokenizer = None
 categories = []
-notes_buffer = []  # list of {'text': str, 'predictions': list[int]}
 rounds_completed = 0
 budget_remaining = EPSILON
 is_frozen = False
+
+
+def load_notes() -> list[dict]:
+    """LOAD NOTES FROM JSON FILE."""
+    if not NOTES_FILE.exists():
+        return []
+    with open(NOTES_FILE) as f:
+        return json.load(f)
+
+
+def save_notes(notes: list[dict]):
+    """SAVE NOTES TO JSON FILE."""
+    NOTES_DIR.mkdir(parents=True, exist_ok=True)
+    with open(NOTES_FILE, 'w') as f:
+        json.dump(notes, f, indent=2)
+
+
+def get_buffer_notes() -> list[dict]:
+    """GET NOTES NOT YET USED IN TRAINING."""
+    return [n for n in load_notes() if not n['used_in_training']]
+
+
+def create_token(hospital_id: int) -> str:
+    """CREATE JWT TOKEN FOR HOSPITAL."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
+    return jwt.encode(
+        {'hospital_id': hospital_id, 'exp': expire},
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
+    """VERIFY JWT TOKEN AND RETURN HOSPITAL ID."""
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        hospital_id = payload.get('hospital_id')
+        if hospital_id != HOSPITAL_ID:
+            raise HTTPException(status_code=403, detail='token does not match this hospital')
+        return hospital_id
+    except JWTError:
+        raise HTTPException(status_code=401, detail='invalid token')
 
 
 def categories_to_predictions(icd_str: str, categories: list[str]) -> list[int]:
@@ -42,8 +92,8 @@ def categories_to_predictions(icd_str: str, categories: list[str]) -> list[int]:
 
 
 def load_model():
-    """LOAD THE HOSPITAL'S LOCAL MODEL AND SEED BUFFER WITH LOCAL DATA."""
-    global model, tokenizer, categories, notes_buffer
+    """LOAD THE HOSPITAL'S LOCAL MODEL AND SEED NOTES WITH LOCAL DATA."""
+    global model, tokenizer, categories
 
     # load categories
     with open(PROC_DIR/'icd_category_meta.json') as f:
@@ -63,19 +113,28 @@ def load_model():
     model.eval()
     print(f'hospital_{HOSPITAL_ID}: model loaded from {model_path}')
 
-    # load initial local data into buffer
-    local_csv = SPLIT_DIR/f'hospital_{HOSPITAL_ID}'/'train.csv'
-    if local_csv.exists():
-        with open(local_csv, newline='') as f:
-            reader = csv.DictReader(f)
-            for i, row in enumerate(reader):
-                if i >= NOTES_PER_ROUND:
-                    break
-                notes_buffer.append({
-                    'text': row['TEXT'],
-                    'predictions': categories_to_predictions(row['ICD_CATEGORIES'], categories),
-                })
-        print(f'hospital_{HOSPITAL_ID}: {len(notes_buffer)} notes loaded from local data')
+    # seed notes file with initial local data if empty
+    if not NOTES_FILE.exists():
+        NOTES_DIR.mkdir(parents=True, exist_ok=True)
+        notes = []
+        local_csv = SPLIT_DIR/f'hospital_{HOSPITAL_ID}'/'train.csv'
+        if local_csv.exists():
+            with open(local_csv, newline='') as f:
+                reader = csv.DictReader(f)
+                for i, row in enumerate(reader):
+                    if i >= NOTES_PER_ROUND:
+                        break
+                    preds = categories_to_predictions(row['ICD_CATEGORIES'], categories)
+                    notes.append({
+                        'id': str(uuid.uuid4()),
+                        'text': row['TEXT'],
+                        'predictions': preds,
+                        'categories': [categories[j] for j, p in enumerate(preds) if p == 1],
+                        'used_in_training': False,
+                        'created_at': datetime.now(timezone.utc).isoformat(),
+                    })
+            save_notes(notes)
+        print(f'hospital_{HOSPITAL_ID}: {len(notes)} notes seeded from local data')
 
 
 async def register_with_central():
@@ -90,7 +149,6 @@ async def register_with_central():
             )
             resp.raise_for_status()
             print(f'hospital_{HOSPITAL_ID}: registered with central server')
-
         except Exception as e:
             print(f'hospital_{HOSPITAL_ID}: failed to register — {e}')
 
@@ -105,20 +163,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+@app.post('/auth/login', response_model=LoginResponse)
+async def login(req: LoginRequest):
+    """LOGIN AND RECEIVE JWT TOKEN."""
+    if req.hospital_id != HOSPITAL_ID or req.password != HOSPITAL_PASSWORD:
+        raise HTTPException(status_code=401, detail='invalid credentials')
+    token = create_token(HOSPITAL_ID)
+    return LoginResponse(access_token=token, token_type='bearer', hospital_id=HOSPITAL_ID)
+
+
 @app.get('/status', response_model=HospitalStatusResponse)
-async def status():
+async def status(_: int = Depends(verify_token)):
     """GET HOSPITAL STATUS."""
+    buffer_count = len(get_buffer_notes())
     return HospitalStatusResponse(
         hospital_id=HOSPITAL_ID,
         status='frozen' if is_frozen else 'active',
         budget_remaining=budget_remaining,
-        notes_collected=len(notes_buffer),
+        notes_collected=buffer_count,
         rounds_completed=rounds_completed,
     )
 
 
 @app.get('/budget', response_model=BudgetResponse)
-async def budget():
+async def budget(_: int = Depends(verify_token)):
     """GET REMAINING PRIVACY BUDGET."""
     return BudgetResponse(
         hospital_id=HOSPITAL_ID,
@@ -129,7 +197,7 @@ async def budget():
 
 
 @app.post('/predict', response_model=PredictResponse)
-async def predict(req: PredictRequest):
+async def predict(req: PredictRequest, _: int = Depends(verify_token)):
     """RUN LOCAL INFERENCE — NOTE NEVER LEAVES THIS HOSPITAL."""
     if model is None:
         raise HTTPException(status_code=503, detail='model not loaded')
@@ -147,7 +215,6 @@ async def predict(req: PredictRequest):
 
     probs = torch.sigmoid(logits).squeeze().tolist()
     preds = [1 if p >= 0.5 else 0 for p in probs]
-
     predicted_categories = [categories[i] for i, p in enumerate(preds) if p == 1]
 
     return PredictResponse(
@@ -158,30 +225,75 @@ async def predict(req: PredictRequest):
     )
 
 
-@app.post('/notes', response_model=NoteResponse)
-async def add_note(req: NoteRequest, background_tasks: BackgroundTasks):
-    """ADD NOTE TO LOCAL BUFFER — TRIGGERS TRAINING WHEN BUFFER IS FULL."""
-    global notes_buffer
+@app.get('/notes', response_model=list[NoteRecord])
+async def get_notes(_: int = Depends(verify_token)):
+    """GET ALL NOTES."""
+    return load_notes()
 
-    # store text and confirmed predictions together
-    notes_buffer.append({'text': req.text, 'predictions': req.predictions})
-    notes_until_round = max(0, NOTES_PER_ROUND - len(notes_buffer))
+
+@app.post('/notes', response_model=NoteResponse)
+async def add_note(req: NoteRequest, background_tasks: BackgroundTasks, _: int = Depends(verify_token)):
+    """ADD NOTE — TRIGGERS TRAINING WHEN BUFFER IS FULL."""
+    notes = load_notes()
+
+    # add new note
+    preds = req.predictions
+    note = {
+        'id': str(uuid.uuid4()),
+        'text': req.text,
+        'predictions': preds,
+        'categories': [categories[i] for i, p in enumerate(preds) if p == 1],
+        'used_in_training': False,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    }
+    notes.append(note)
+    save_notes(notes)
+
+    buffer_count = len(get_buffer_notes())
+    notes_until_round = max(0, NOTES_PER_ROUND - buffer_count)
 
     # trigger training in background when buffer is full
-    if len(notes_buffer) >= NOTES_PER_ROUND and not is_frozen:
+    if buffer_count >= NOTES_PER_ROUND and not is_frozen:
         background_tasks.add_task(run_training)
 
     return NoteResponse(
         hospital_id=HOSPITAL_ID,
-        notes_collected=len(notes_buffer),
+        notes_collected=buffer_count,
         notes_until_round=notes_until_round,
         message='note added' if notes_until_round > 0 else 'round triggered',
     )
 
 
+@app.delete('/notes/{note_id}')
+async def delete_note(note_id: str, _: int = Depends(verify_token)):
+    """DELETE A NOTE."""
+    notes = load_notes()
+    updated = [n for n in notes if n['id'] != note_id]
+    if len(updated) == len(notes):
+        raise HTTPException(status_code=404, detail='note not found')
+    save_notes(updated)
+    return {'message': 'note deleted'}
+
+
+@app.patch('/notes/{note_id}', response_model=NoteRecord)
+async def update_note(note_id: str, req: NoteUpdateRequest, _: int = Depends(verify_token)):
+    """UPDATE A NOTE."""
+    notes = load_notes()
+    for note in notes:
+        if note['id'] == note_id:
+            if req.text is not None:
+                note['text'] = req.text
+            if req.predictions is not None:
+                note['predictions'] = req.predictions
+                note['categories'] = [categories[i] for i, p in enumerate(req.predictions) if p == 1]
+            save_notes(notes)
+            return note
+    raise HTTPException(status_code=404, detail='note not found')
+
+
 async def run_training():
     """RUN LOCAL DP TRAINING AND SEND WEIGHTS TO CENTRAL SERVER."""
-    global model, notes_buffer, rounds_completed, budget_remaining, is_frozen
+    global model, rounds_completed, budget_remaining, is_frozen
 
     if is_frozen:
         print(f'hospital_{HOSPITAL_ID}: budget exhausted, skipping training')
@@ -192,11 +304,17 @@ async def run_training():
         print(f'hospital_{HOSPITAL_ID}: budget exhausted, model frozen')
         return
 
+    # get buffer notes
+    buffer_notes = get_buffer_notes()
+
+    if len(buffer_notes) < NOTES_PER_ROUND:
+        return
+
     print(f'hospital_{HOSPITAL_ID}: starting local dp training...')
 
     # prepare texts and labels from buffer
-    texts = [n['text'] for n in notes_buffer]
-    labels = torch.tensor([n['predictions'] for n in notes_buffer], dtype=torch.float)
+    texts = [n['text'] for n in buffer_notes]
+    labels = torch.tensor([n['predictions'] for n in buffer_notes], dtype=torch.float)
 
     encodings = tokenizer(
         texts,
@@ -250,6 +368,14 @@ async def run_training():
 
     model.eval()
 
+    # mark buffer notes as used in training
+    notes = load_notes()
+    buffer_ids = {n['id'] for n in buffer_notes}
+    for note in notes:
+        if note['id'] in buffer_ids:
+            note['used_in_training'] = True
+    save_notes(notes)
+
     # send weights to central
     weights = {k: v.cpu().tolist() for k, v in model_dp._module.state_dict().items()}
 
@@ -269,12 +395,9 @@ async def run_training():
         except Exception as e:
             print(f'hospital_{HOSPITAL_ID}: failed to send weights — {e}')
 
-    # clear buffer
-    notes_buffer = []
-
 
 @app.post('/train', response_model=TrainResponse)
-async def train(background_tasks: BackgroundTasks):
+async def train(background_tasks: BackgroundTasks, _: int = Depends(verify_token)):
     """MANUALLY TRIGGER LOCAL TRAINING."""
     background_tasks.add_task(run_training)
     return TrainResponse(

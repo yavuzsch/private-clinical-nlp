@@ -12,6 +12,7 @@ MODELS_DIR = BASE_DIR/'models'
 DATA_DIR = BASE_DIR/'data'
 SPLIT_DIR = DATA_DIR/'split'
 PROC_DIR = DATA_DIR/'processed'
+NOTES_DIR = BASE_DIR/'notes'
 
 # federated
 NUM_HOSPITALS = 10
@@ -26,6 +27,12 @@ MAX_GRAD_NORM = 3.0
 # privacy
 EPSILON = float(os.getenv('EPSILON', '8.0'))
 DELTA = 1e-5
+
+# auth
+HOSPITAL_PASSWORD = os.getenv('HOSPITAL_PASSWORD', 'hospital')
+JWT_SECRET = os.getenv('JWT_SECRET', 'secret')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 # ports
 CENTRAL_PORT = 8000

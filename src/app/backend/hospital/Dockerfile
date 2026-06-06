@@ -9,7 +9,8 @@ ENV PYTHONPATH=/app/src/app/backend
 
 RUN pip install --no-cache-dir\
     opacus\
-    datasets
+    datasets\
+    python-jose
 
 EXPOSE 8100
 

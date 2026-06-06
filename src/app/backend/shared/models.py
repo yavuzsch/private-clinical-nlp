@@ -29,11 +29,25 @@ class NoteRequest(BaseModel):
     predictions: list[int]  # confirmed labels from user
 
 
+class NoteRecord(BaseModel):
+    id: str
+    text: str
+    predictions: list[int]
+    categories: list[str]
+    used_in_training: bool
+    created_at: str
+
+
 class NoteResponse(BaseModel):
     hospital_id: int
     notes_collected: int
     notes_until_round: int
     message: str
+
+
+class NoteUpdateRequest(BaseModel):
+    text: Optional[str] = None
+    predictions: Optional[list[int]] = None
 
 
 class PredictRequest(BaseModel):
@@ -109,3 +123,14 @@ class MetricsResponse(BaseModel):
 
 class UpdateModelRequest(BaseModel):
     weights: dict[str, list]
+
+
+class LoginRequest(BaseModel):
+    hospital_id: int
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str  # bearer
+    hospital_id: int
