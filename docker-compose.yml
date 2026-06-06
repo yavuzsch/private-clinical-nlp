@@ -1,0 +1,210 @@
+services:
+  central:
+    build:
+      context: .
+      dockerfile: src/app/backend/central/Dockerfile
+    container_name: central
+    ports:
+      - "8000:8000"
+    environment:
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    networks:
+      - federated
+
+  hospital_0:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_0
+    ports:
+      - "8100:8100"
+    environment:
+      - HOSPITAL_ID=0
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_1:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_1
+    ports:
+      - "8101:8101"
+    environment:
+      - HOSPITAL_ID=1
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_2:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_2
+    ports:
+      - "8102:8102"
+    environment:
+      - HOSPITAL_ID=2
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_3:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_3
+    ports:
+      - "8103:8103"
+    environment:
+      - HOSPITAL_ID=3
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_4:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_4
+    ports:
+      - "8104:8104"
+    environment:
+      - HOSPITAL_ID=4
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_5:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_5
+    ports:
+      - "8105:8105"
+    environment:
+      - HOSPITAL_ID=5
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_6:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_6
+    ports:
+      - "8106:8106"
+    environment:
+      - HOSPITAL_ID=6
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_7:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_7
+    ports:
+      - "8107:8107"
+    environment:
+      - HOSPITAL_ID=7
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_8:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_8
+    ports:
+      - "8108:8108"
+    environment:
+      - HOSPITAL_ID=8
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+  hospital_9:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_9
+    ports:
+      - "8109:8109"
+    environment:
+      - HOSPITAL_ID=9
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    depends_on:
+      - central
+    networks:
+      - federated
+
+networks:
+  federated:
+    driver: bridge
