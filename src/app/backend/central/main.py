@@ -4,6 +4,7 @@ import torch
 from contextlib import asynccontextmanager
 from transformers import AutoModelForSequenceClassification
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import (
     MODEL_SLUG, NUM_LABELS, MODELS_DIR,
@@ -114,6 +115,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post('/hospitals/register', response_model=RegisterResponse)

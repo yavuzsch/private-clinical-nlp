@@ -12,6 +12,7 @@ from opacus import PrivacyEngine
 from jose import JWTError, jwt
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import (
     MODEL_NAME, MODEL_SLUG, NUM_LABELS, MODELS_DIR, PROC_DIR, SPLIT_DIR, NOTES_DIR,
@@ -161,6 +162,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get('/categories')
+async def get_categories():
+    """GET ICD CATEGORY LIST IN MODEL ORDER."""
+    return {'categories': categories}
 
 
 @app.post('/auth/login', response_model=LoginResponse)
