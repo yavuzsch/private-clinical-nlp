@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:8000'
+const BASE = '/central'
 
 export async function listHospitals() {
   const res = await fetch(`${BASE}/hospitals`)

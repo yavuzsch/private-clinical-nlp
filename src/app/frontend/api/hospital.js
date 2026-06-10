@@ -1,4 +1,4 @@
-const base = (hospitalId) => `http://localhost:${8100 + hospitalId}`
+const base = (hospitalId) => `/hospital/${hospitalId}`
 
 export async function loginHospital(hospitalId, password) {
   const res = await fetch(`${base(hospitalId)}/auth/login`, {
