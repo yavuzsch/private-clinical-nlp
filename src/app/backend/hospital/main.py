@@ -4,6 +4,7 @@ import csv
 import uuid
 import httpx
 import torch
+import asyncio
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from torch.utils.data import DataLoader
@@ -102,7 +103,7 @@ def load_model():
     categories = meta['categories']
 
     # load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(str(MODELS_DIR/'tokenizer'))
 
     # load model — use pre-trained federated dp model as starting point
     model_path = MODELS_DIR/'federated_dp'/MODEL_SLUG/f'epsilon_{EPSILON}'/'best_model'
@@ -110,6 +111,7 @@ def load_model():
         str(model_path),
         num_labels=NUM_LABELS,
         problem_type='multi_label_classification',
+        low_cpu_mem_usage=True,
     )
     model.eval()
     print(f'hospital_{HOSPITAL_ID}: model loaded from {model_path}')
@@ -141,31 +143,39 @@ def load_model():
 async def register_with_central():
     """REGISTER WITH CENTRAL SERVER."""
     port = HOSPITAL_BASE_PORT + HOSPITAL_ID
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.post(
-                f'{CENTRAL_URL}/hospitals/register',
-                json={'hospital_id': HOSPITAL_ID, 'port': port},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            print(f'hospital_{HOSPITAL_ID}: registered with central server')
-        except Exception as e:
-            print(f'hospital_{HOSPITAL_ID}: failed to register — {e}')
+    for attempt in range(5):
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.post(
+                    f'{CENTRAL_URL}/hospitals/register',
+                    json={'hospital_id': HOSPITAL_ID, 'port': port},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                print(f'hospital_{HOSPITAL_ID}: registered with central server')
+                return
+            except Exception as e:
+                print(f'hospital_{HOSPITAL_ID}: register attempt {attempt+1} failed — {e}')
+                await asyncio.sleep(3)
+    print(f'hospital_{HOSPITAL_ID}: could not register after 5 attempts')
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_model()
-    await register_with_central()
+    asyncio.create_task(delayed_register())
     yield
+
+async def delayed_register():
+    await asyncio.sleep(10)
+    await register_with_central()
 
 
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

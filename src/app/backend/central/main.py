@@ -136,7 +136,6 @@ async def register_hospital(req: RegisterRequest):
         rounds_completed=0,
     )
     print(f'central: hospital_{req.hospital_id} registered on port {req.port}')
-    await distribute_global_model([req.hospital_id])
     return RegisterResponse(
         hospital_id=req.hospital_id,
         status='active',

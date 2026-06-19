@@ -14,6 +14,12 @@ services:
       - ./data:/app/data:ro
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   hospital_0:
     build:
@@ -33,9 +39,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      central:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_1:
     build:
@@ -55,9 +68,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_0:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_2:
     build:
@@ -77,9 +97,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_1:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_3:
     build:
@@ -99,9 +126,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_2:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_4:
     build:
@@ -121,9 +155,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_3:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_5:
     build:
@@ -143,9 +184,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_4:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8105/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_6:
     build:
@@ -165,9 +213,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_5:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8106/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_7:
     build:
@@ -187,9 +242,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_6:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8107/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_8:
     build:
@@ -209,9 +271,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_7:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   hospital_9:
     build:
@@ -231,9 +300,16 @@ services:
       - ./data:/app/data:ro
       - ./notes:/app/notes
     depends_on:
-      - central
+      hospital_8:
+        condition: service_healthy
     networks:
       - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8109/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   frontend:
     build:
@@ -247,7 +323,8 @@ services:
     networks:
       - federated
     depends_on:
-      - central
+      hospital_9:
+        condition: service_healthy
 
 networks:
   federated:
