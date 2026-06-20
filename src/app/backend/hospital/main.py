@@ -365,7 +365,19 @@ async def run_training(force: bool = False):
     # dp training
     ensure_model_loaded()
     model.train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+
+    # freeze embeddings and first 6 layers for opacus compatibility
+    for param in model.bert.embeddings.parameters():
+        param.requires_grad = False
+
+    for i in range(6):
+        for param in model.bert.encoder.layer[i].parameters():
+            param.requires_grad = False
+
+    optimizer = torch.optim.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=LEARNING_RATE,
+    )
 
     privacy_engine = PrivacyEngine()
     model_dp, optimizer_dp, loader_dp = privacy_engine.make_private_with_epsilon(
