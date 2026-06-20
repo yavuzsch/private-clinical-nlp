@@ -315,7 +315,7 @@ async def update_note(note_id: str, req: NoteUpdateRequest, _: int = Depends(ver
     raise HTTPException(status_code=404, detail='note not found')
 
 
-async def run_training():
+async def run_training(force: bool = False):
     """RUN LOCAL DP TRAINING AND SEND WEIGHTS TO CENTRAL SERVER."""
     global model, rounds_completed, budget_remaining, is_frozen
 
@@ -331,7 +331,11 @@ async def run_training():
     # get buffer notes
     buffer_notes = get_buffer_notes()
 
-    if len(buffer_notes) < NOTES_PER_ROUND:
+    if not force and len(buffer_notes) < NOTES_PER_ROUND:
+        return
+
+    if len(buffer_notes) == 0:
+        print(f'hospital_{HOSPITAL_ID}: no pending notes, skipping training')
         return
 
     print(f'hospital_{HOSPITAL_ID}: starting local dp training...')
@@ -423,12 +427,28 @@ async def run_training():
 @app.post('/train', response_model=TrainResponse)
 async def train(background_tasks: BackgroundTasks, _: int = Depends(verify_token)):
     """MANUALLY TRIGGER LOCAL TRAINING."""
-    background_tasks.add_task(run_training)
+    if is_frozen:
+        return TrainResponse(
+            hospital_id=HOSPITAL_ID,
+            rounds_completed=rounds_completed,
+            budget_remaining=budget_remaining,
+            status='frozen',
+        )
+
+    if len(get_buffer_notes()) == 0:
+        return TrainResponse(
+            hospital_id=HOSPITAL_ID,
+            rounds_completed=rounds_completed,
+            budget_remaining=budget_remaining,
+            status='no_pending_notes',
+        )
+
+    background_tasks.add_task(run_training, force=True)
     return TrainResponse(
         hospital_id=HOSPITAL_ID,
         rounds_completed=rounds_completed,
         budget_remaining=budget_remaining,
-        status='frozen' if is_frozen else 'training',
+        status='training',
     )
 
 
