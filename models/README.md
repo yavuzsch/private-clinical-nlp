@@ -10,7 +10,7 @@ pip install torch transformers datasets scikit-learn
 
 Federated:
 ```bash
-pip install torch transformers datasets scikit-learn flwr
+pip install torch transformers datasets scikit-learn
 ```
 
 
