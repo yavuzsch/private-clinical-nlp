@@ -93,9 +93,9 @@ def categories_to_predictions(icd_str: str, categories: list[str]) -> list[int]:
     return [1 if cat in active else 0 for cat in categories]
 
 
-def load_model():
-    """LOAD THE HOSPITAL'S LOCAL MODEL AND SEED NOTES WITH LOCAL DATA."""
-    global model, tokenizer, categories
+def load_categories():
+    """LOAD CATEGORY LIST, TOKENIZER, AND SEED NOTES — RUNS EAGERLY AT STARTUP."""
+    global tokenizer, categories
 
     # load categories
     with open(PROC_DIR/'icd_category_meta.json') as f:
@@ -104,17 +104,6 @@ def load_model():
 
     # load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(str(MODELS_DIR/'tokenizer'))
-
-    # load model — use pre-trained federated dp model as starting point
-    model_path = MODELS_DIR/'federated_dp'/MODEL_SLUG/f'epsilon_{EPSILON}'/'best_model'
-    model = AutoModelForSequenceClassification.from_pretrained(
-        str(model_path),
-        num_labels=NUM_LABELS,
-        problem_type='multi_label_classification',
-        low_cpu_mem_usage=True,
-    )
-    model.eval()
-    print(f'hospital_{HOSPITAL_ID}: model loaded from {model_path}')
 
     # seed notes file with initial local data if empty
     if not NOTES_FILE.exists():
@@ -140,6 +129,21 @@ def load_model():
         print(f'hospital_{HOSPITAL_ID}: {len(notes)} notes seeded from local data')
 
 
+def ensure_model_loaded():
+    """LAZILY LOAD THE HOSPITAL'S LOCAL MODEL ON FIRST USE (PREDICT / TRAIN / UPDATE-MODEL)."""
+    global model
+    if model is not None:
+        return
+
+    model_path = MODELS_DIR/'federated_dp'/MODEL_SLUG/f'epsilon_{EPSILON}'/'best_model'
+    model = AutoModelForSequenceClassification.from_pretrained(
+        str(model_path), num_labels=NUM_LABELS,
+        problem_type='multi_label_classification', low_cpu_mem_usage=True,
+    )
+    model.eval()
+    print(f'hospital_{HOSPITAL_ID}: model loaded from {model_path}')
+
+
 async def register_with_central():
     """REGISTER WITH CENTRAL SERVER."""
     port = HOSPITAL_BASE_PORT + HOSPITAL_ID
@@ -162,7 +166,7 @@ async def register_with_central():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_model()
+    load_categories()
     asyncio.create_task(delayed_register())
     yield
 
@@ -223,8 +227,7 @@ async def budget(_: int = Depends(verify_token)):
 @app.post('/predict', response_model=PredictResponse)
 async def predict(req: PredictRequest, _: int = Depends(verify_token)):
     """RUN LOCAL INFERENCE — NOTE NEVER LEAVES THIS HOSPITAL."""
-    if model is None:
-        raise HTTPException(status_code=503, detail='model not loaded')
+    ensure_model_loaded()
 
     inputs = tokenizer(
         req.text,
@@ -360,6 +363,7 @@ async def run_training(force: bool = False):
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     # dp training
+    ensure_model_loaded()
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
@@ -456,9 +460,7 @@ async def train(background_tasks: BackgroundTasks, _: int = Depends(verify_token
 async def update_model(req: UpdateModelRequest):
     """RECEIVE UPDATED GLOBAL MODEL FROM CENTRAL SERVER."""
     global model
-
-    if model is None:
-        raise HTTPException(status_code=503, detail='model not loaded')
+    ensure_model_loaded()
 
     # load new weights into model
     new_state_dict = {k: torch.tensor(v) for k, v in req.weights.items()}
