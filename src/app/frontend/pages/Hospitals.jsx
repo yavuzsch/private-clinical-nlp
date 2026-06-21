@@ -4,6 +4,7 @@ import { listHospitals, removeHospital, getCentralStatus } from '../api/central'
 export default function Hospitals() {
   const [hospitals, setHospitals] = useState([])
   const [epsilon, setEpsilon] = useState(8.0)
+  const [delta, setDelta] = useState(1e-5)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState(null)
@@ -22,6 +23,7 @@ export default function Hospitals() {
       ])
       setHospitals(hospitalsData)
       setEpsilon(sysData.epsilon)
+      setDelta(sysData.delta)
     } catch {
       setError('failed to fetch — is central server running?')
     } finally {
@@ -68,6 +70,9 @@ export default function Hospitals() {
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: '#3d5166' }}>
           {active.length} active · {frozen.length} frozen · {hospitals.length} total
+        </div>
+        <div style={{ marginTop: 4, fontSize: 11, color: '#3d5166' }}>
+          ε = {epsilon} · δ = {delta}
         </div>
       </div>
 
