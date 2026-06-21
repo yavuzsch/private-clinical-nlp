@@ -108,4 +108,6 @@ class ClinicalClientDP:
                 loss.backward()
                 optimizer.step()
 
-        return get_parameters(private_model._module), self.train_size, {}
+        epsilon_used = privacy_engine.get_epsilon(self.delta)
+
+        return get_parameters(private_model._module), self.train_size, {'epsilon_used': epsilon_used}

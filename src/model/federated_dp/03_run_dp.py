@@ -86,6 +86,9 @@ history = []
 best_f1 = 0.0
 best_parameters = None
 
+budget_remaining = {i: args.epsilon for i in range(args.num_clients)}
+hospital_frozen = {i: False for i in range(args.num_clients)}
+
 for round_num in range(1, args.num_rounds + 1):
     print(f'\nround {round_num}/{args.num_rounds}')
 
@@ -94,6 +97,11 @@ for round_num in range(1, args.num_rounds + 1):
     all_sizes = []
 
     for i in range(args.num_clients):
+        if hospital_frozen[i]:
+            continue
+
+        target_epsilon = min(budget_remaining[i], args.epsilon / args.num_rounds)
+
         client = ClinicalClientDP(
             hospital_id=i,
             model_name=args.model_name,
@@ -101,17 +109,27 @@ for round_num in range(1, args.num_rounds + 1):
             learning_rate=args.learning_rate,
             batch_size=args.batch_size,
             local_epochs=args.local_epochs,
-            epsilon=args.epsilon,
+            epsilon=target_epsilon,
             delta=args.delta,
             max_grad_norm=args.max_grad_norm,
         )
-        parameters, size, _ = client.fit(global_parameters, {})
+        parameters, size, info = client.fit(global_parameters, {})
         all_parameters.append(parameters)
         all_sizes.append(size)
+
+        budget_remaining[i] = max(0, budget_remaining[i] - info['epsilon_used'])
+        if budget_remaining[i] <= 0:
+            hospital_frozen[i] = True
+            print(f'hospital_{i}: budget exhausted after round {round_num}')
+
         del client
         torch.cuda.empty_cache()
 
     # fedavg
+    if not all_sizes:
+        print('all hospitals exhausted their budget, stopping early')
+        break
+
     total = sum(all_sizes)
     global_parameters = [
         np.sum([p[i] * s / total for p, s in zip(all_parameters, all_sizes)], axis=0)
@@ -174,6 +192,8 @@ results = {
     'max_grad_norm': args.max_grad_norm,
     'best_f1_macro': best_f1,
     'history': history,
+    'final_budget_remaining': budget_remaining,
+    'final_hospital_frozen': hospital_frozen,
 }
 with open(RUN_DIR/'results.json', 'w') as f:
     json.dump(results, f, indent=2)
