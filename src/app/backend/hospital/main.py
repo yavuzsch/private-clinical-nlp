@@ -432,6 +432,7 @@ async def run_training(force: bool = False):
                     'weights': weights,
                     'rounds_completed': rounds_completed,
                     'budget_remaining': budget_remaining,
+                    'train_size': len(buffer_notes),
                 },
                 timeout=120,
             )

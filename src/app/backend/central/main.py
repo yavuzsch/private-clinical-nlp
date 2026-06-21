@@ -19,10 +19,12 @@ from shared.models import (
 
 
 WEIGHTS_PATH = '/tmp/global_weights.pt'
+PENDING_THRESHOLD = 3  # number of hospital submissions to buffer before running fedavg
 
 # state
 hospitals = {}  # hospital_id → HospitalInfo
 total_rounds = 0
+pending_weights = {}  # hospital_id → {'weights': {...}, 'train_size': int}
 
 
 def load_global_model():
@@ -163,7 +165,7 @@ async def remove_hospital(hospital_id: int):
 
 @app.post('/aggregate', response_model=AggregateResponse)
 async def aggregate(payload: WeightsPayload):
-    """RECEIVE WEIGHTS FROM A HOSPITAL AND RUN FEDAVG."""
+    """RECEIVE WEIGHTS FROM A HOSPITAL, BUFFER UNTIL ENOUGH SUBMISSIONS ARRIVE, THEN RUN FEDAVG."""
     global total_rounds
 
     if payload.hospital_id not in hospitals:
@@ -175,34 +177,49 @@ async def aggregate(payload: WeightsPayload):
     if payload.budget_remaining <= 0:
         hospitals[payload.hospital_id].status = 'frozen'
 
-    # fedavg — average incoming weights with current global weights
-    global_weights = read_weights()
-    incoming = {k: torch.tensor(v, dtype=torch.float16) for k, v in payload.weights.items()}
-    active_count = sum(1 for h in hospitals.values() if h.status == 'active')
-
-    if active_count > 0:
-        alpha = 1.0 / active_count
-        new_weights = {}
-        for k in global_weights:
-            if k in incoming:
-                new_weights[k] = ((1 - alpha) * global_weights[k] + alpha * incoming[k]).to(torch.float16)
-            else:
-                new_weights[k] = global_weights[k]
-        write_weights(new_weights)
-        del new_weights
-
-    del global_weights
-    del incoming
-
-    total_rounds += 1
-    print(f'central: fedavg complete — round {total_rounds}, hospital_{payload.hospital_id}')
+    # buffer this hospital's submission (overwrites any earlier pending submission from it)
+    pending_weights[payload.hospital_id] = {
+        'weights': {k: torch.tensor(v, dtype=torch.float16) for k, v in payload.weights.items()},
+        'train_size': payload.train_size,
+    }
+    print(f'central: hospital_{payload.hospital_id} buffered ({len(pending_weights)}/{PENDING_THRESHOLD})')
 
     active_ids = [h.hospital_id for h in hospitals.values() if h.status == 'active']
+
+    if len(pending_weights) < PENDING_THRESHOLD:
+        return AggregateResponse(
+            rounds_completed=total_rounds,
+            hospitals_included=active_ids,
+            status='pending',
+        )
+
+    # fedavg — true data-size-weighted average over all buffered submissions
+    global_weights = read_weights()
+    total_size = sum(p['train_size'] for p in pending_weights.values())
+
+    new_weights = {}
+    for k in global_weights:
+        contributions = [p['weights'][k] * p['train_size'] for p in pending_weights.values() if k in p['weights']]
+        if contributions and total_size > 0:
+            new_weights[k] = (sum(contributions) / total_size).to(torch.float16)
+        else:
+            new_weights[k] = global_weights[k]
+    write_weights(new_weights)
+
+    aggregated_ids = list(pending_weights.keys())
+    pending_weights.clear()
+
+    del global_weights
+    del new_weights
+
+    total_rounds += 1
+    print(f'central: fedavg complete — round {total_rounds}, hospitals {aggregated_ids}')
+
     await distribute_global_model(active_ids)
 
     return AggregateResponse(
         rounds_completed=total_rounds,
-        hospitals_included=active_ids,
+        hospitals_included=aggregated_ids,
         status='updated',
     )
 

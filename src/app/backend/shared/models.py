@@ -66,6 +66,7 @@ class WeightsPayload(BaseModel):
     weights: dict[str, list]  # layer name → weight values
     rounds_completed: int
     budget_remaining: float
+    train_size: int
 
 
 class TrainResponse(BaseModel):
