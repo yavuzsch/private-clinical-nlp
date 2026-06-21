@@ -360,7 +360,7 @@ async def run_training(force: bool = False):
         for i in range(len(texts))
     ]
 
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    loader = DataLoader(dataset, batch_size=min(BATCH_SIZE, len(dataset)), shuffle=True)
 
     # dp training
     ensure_model_loaded()
