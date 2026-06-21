@@ -3,7 +3,6 @@ from pathlib import Path
 from datasets import load_from_disk
 from transformers import AutoModelForSequenceClassification
 import torch
-import flwr as fl
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -31,7 +30,7 @@ def set_parameters(model, parameters):
     model.load_state_dict(state_dict, strict=True)
 
 
-class ClinicalClient(fl.client.NumPyClient):
+class ClinicalClient:
     def __init__(self, hospital_id, model_name, model_slug, learning_rate, batch_size, local_epochs):
         torch.manual_seed(42 + hospital_id)
         self.hospital_id = hospital_id
