@@ -120,7 +120,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,15 +132,15 @@ async def register_hospital(req: RegisterRequest):
     hospitals[req.hospital_id] = HospitalInfo(
         hospital_id=req.hospital_id,
         port=req.port,
-        status='active',
-        budget_remaining=EPSILON,
-        notes_collected=0,
-        rounds_completed=0,
+        status=req.status or 'active',
+        budget_remaining=req.budget_remaining if req.budget_remaining is not None else EPSILON,
+        notes_collected=req.notes_collected or 0,
+        rounds_completed=req.rounds_completed or 0,
     )
     print(f'central: hospital_{req.hospital_id} registered on port {req.port}')
     return RegisterResponse(
         hospital_id=req.hospital_id,
-        status='active',
+        status=hospitals[req.hospital_id].status,
         epsilon=EPSILON,
         delta=DELTA,
         message=f'hospital_{req.hospital_id} registered successfully',
@@ -277,6 +277,15 @@ async def status():
         epsilon=EPSILON,
         delta=DELTA,
     )
+
+
+@app.patch('/hospitals/{hospital_id}/notes')
+async def update_notes_count(hospital_id: int, payload: dict):
+    """UPDATE NOTE COUNT FOR A HOSPITAL."""
+    if hospital_id not in hospitals:
+        raise HTTPException(status_code=404, detail='hospital not found')
+    hospitals[hospital_id].notes_collected = payload.get('notes_collected', 0)
+    return {'message': 'updated'}
 
 
 @app.get('/models/metrics', response_model=list[MetricsResponse])

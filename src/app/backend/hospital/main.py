@@ -5,6 +5,7 @@ import uuid
 import httpx
 import torch
 import asyncio
+import gc
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from torch.utils.data import DataLoader
@@ -127,6 +128,15 @@ def load_categories():
                     })
             save_notes(notes)
         print(f'hospital_{HOSPITAL_ID}: {len(notes)} notes seeded from local data')
+    
+    # load persisted budget and rounds
+    global budget_remaining, rounds_completed
+    meta_file = NOTES_DIR/f'hospital_{HOSPITAL_ID}_meta.json'
+    if meta_file.exists():
+        with open(meta_file) as f:
+            meta = json.load(f)
+        budget_remaining = meta.get('budget_remaining', EPSILON)
+        rounds_completed = meta.get('rounds_completed', 0)
 
 
 def ensure_model_loaded():
@@ -152,7 +162,14 @@ async def register_with_central():
             try:
                 resp = await client.post(
                     f'{CENTRAL_URL}/hospitals/register',
-                    json={'hospital_id': HOSPITAL_ID, 'port': port},
+                    json={
+                        'hospital_id': HOSPITAL_ID,
+                        'port': port,
+                        'budget_remaining': budget_remaining,
+                        'rounds_completed': rounds_completed,
+                        'notes_collected': len(load_notes()),
+                        'status': 'frozen' if budget_remaining <= 0 else 'active',
+                    },
                     timeout=30,
                 )
                 resp.raise_for_status()
@@ -276,6 +293,17 @@ async def add_note(req: NoteRequest, background_tasks: BackgroundTasks, _: int =
     notes.append(note)
     save_notes(notes)
 
+    # update note count at central
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.patch(
+                f'{CENTRAL_URL}/hospitals/{HOSPITAL_ID}/notes',
+                json={'notes_collected': len(notes)},
+                timeout=10,
+            )
+        except Exception:
+            pass
+
     buffer_count = len(get_buffer_notes())
     notes_until_round = max(0, NOTES_PER_ROUND - buffer_count)
 
@@ -299,6 +327,18 @@ async def delete_note(note_id: str, _: int = Depends(verify_token)):
     if len(updated) == len(notes):
         raise HTTPException(status_code=404, detail='note not found')
     save_notes(updated)
+
+    # update note count at central
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.patch(
+                f'{CENTRAL_URL}/hospitals/{HOSPITAL_ID}/notes',
+                json={'notes_collected': len(updated)},
+                timeout=10,
+            )
+        except Exception:
+            pass
+
     return {'message': 'note deleted'}
 
 
@@ -385,7 +425,7 @@ async def run_training(force: bool = False):
         optimizer=optimizer,
         data_loader=loader,
         epochs=LOCAL_EPOCHS,
-        target_epsilon=min(budget_remaining, EPSILON),
+        target_epsilon=budget_remaining / 10,
         target_delta=DELTA,
         max_grad_norm=MAX_GRAD_NORM,
     )
@@ -403,6 +443,7 @@ async def run_training(force: bool = False):
 
     # update budget
     epsilon_used = privacy_engine.get_epsilon(DELTA)
+    print(f'hospital_{HOSPITAL_ID}: epsilon used this round = {epsilon_used:.4f}')
     budget_remaining = max(0, budget_remaining - epsilon_used)
     rounds_completed += 1
 
@@ -421,7 +462,17 @@ async def run_training(force: bool = False):
     save_notes(notes)
 
     # send weights to central
-    weights = {k: v.cpu().tolist() for k, v in model_dp._module.state_dict().items()}
+    FROZEN_PREFIXES = ('bert.embeddings.', *[f'bert.encoder.layer.{i}.' for i in range(6)])
+    weights = {
+        k: v.cpu().tolist()
+        for k, v in model_dp._module.state_dict().items()
+        if not any(k.startswith(p) for p in FROZEN_PREFIXES)
+    }
+
+    # free all training memory
+    del optimizer, privacy_engine, model_dp, optimizer_dp, loader_dp
+    model = None
+    gc.collect()
 
     async with httpx.AsyncClient() as client:
         try:
@@ -439,6 +490,16 @@ async def run_training(force: bool = False):
             print(f'hospital_{HOSPITAL_ID}: weights sent to central')
         except Exception as e:
             print(f'hospital_{HOSPITAL_ID}: failed to send weights — {e}')
+
+    # persist budget and rounds
+    meta_file = NOTES_DIR/f'hospital_{HOSPITAL_ID}_meta.json'
+    with open(meta_file, 'w') as f:
+        json.dump({
+            'budget_remaining': budget_remaining,
+            'rounds_completed': rounds_completed,
+        }, f)
+    
+    gc.collect()
 
 
 @app.post('/train', response_model=TrainResponse)

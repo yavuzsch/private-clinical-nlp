@@ -5,6 +5,10 @@ from pydantic import BaseModel
 class RegisterRequest(BaseModel):
     hospital_id: int
     port: int
+    budget_remaining: Optional[float] = None
+    rounds_completed: Optional[int] = None
+    notes_collected: Optional[int] = None
+    status: Optional[str] = None
 
 
 class RegisterResponse(BaseModel):

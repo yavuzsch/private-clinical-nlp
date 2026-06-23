@@ -11,6 +11,8 @@ export default function Hospitals() {
 
   useEffect(() => {
     fetchAll()
+    const interval = setInterval(fetchAll, 10000)
+    return () => clearInterval(interval)
   }, [])
 
   const fetchAll = async () => {
@@ -144,20 +146,6 @@ export default function Hospitals() {
                     }} />
                   </div>
                 </div>
-
-                <button
-                  onClick={() => handleRemove(h.hospital_id)}
-                  disabled={removing === h.hospital_id}
-                  style={{
-                    padding: '6px 14px', background: 'transparent',
-                    border: '1px solid #2a1515', borderRadius: 3,
-                    color: '#aa4a4a', fontSize: 10, letterSpacing: 1,
-                    cursor: removing === h.hospital_id ? 'not-allowed' : 'pointer',
-                    fontFamily: "'IBM Plex Mono', monospace",
-                  }}
-                >
-                  {removing === h.hospital_id ? 'REMOVING...' : 'REMOVE'}
-                </button>
               </div>
             )
           })}
