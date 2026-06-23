@@ -122,7 +122,7 @@ def load_categories():
                         'text': row['TEXT'],
                         'predictions': preds,
                         'categories': [categories[j] for j, p in enumerate(preds) if p == 1],
-                        'used_in_training': False,
+                        'used_in_training': True,
                         'created_at': datetime.now(timezone.utc).isoformat(),
                     })
             save_notes(notes)

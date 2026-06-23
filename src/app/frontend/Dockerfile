@@ -12,4 +12,4 @@ COPY nginx.conf.template /etc/nginx/conf.d/nginx.conf.template
 COPY generate_nginx.sh /generate_nginx.sh
 RUN chmod +x /generate_nginx.sh
 EXPOSE 80
-CMD ["/generate_nginx.sh"]
+CMD ["sh", "/generate_nginx.sh"]
