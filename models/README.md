@@ -72,4 +72,4 @@ private-clinical-nlp/
 | Centralized DistilBERT | 0.5403 | 0.6706 | 0.6436 | 0.7018 | 0.7559 | 0.4843 | 0.6026 | 0.1875 | 0.8129 |
 | Centralized BERT-base | 0.5491 | 0.6756 | 0.6518 | 0.6893 | 0.7468 | 0.4981 | 0.6168 | 0.1876 | 0.8104 |
 | Centralized Bio_ClinicalBERT | 0.5641 | 0.6779 | 0.6550 | 0.7464 | 0.7531 | 0.5059 | 0.6163 | 0.1855 | 0.8169 |
-| Federated Bio_ClinicalBERT | - | - | - | - | - | - | - | - | - |
+| Federated Bio_ClinicalBERT | 0.5271 | 0.6669 | 0.6364 | 0.6998 | 0.7564 | 0.4719 | 0.5964 | 0.1886 | 0.8077 |
