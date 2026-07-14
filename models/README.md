@@ -3,14 +3,8 @@ Trains and evaluates clinical NLP models for ICD-9 category classification using
 
 
 ## Requirements
-Centralized:
 ```bash
-pip install torch transformers datasets scikit-learn
-```
-
-Federated:
-```bash
-pip install torch transformers datasets scikit-learn
+pip install torch transformers datasets scikit-learn opacus
 ```
 
 
@@ -39,6 +33,15 @@ Run federated simulation across 10 virtual hospitals:
 python src/model/federated/03_run.py --model_name emilyalsentzer/Bio_ClinicalBERT --num_rounds 10 --num_clients 10 --local_epochs 1 --batch_size 16 --learning_rate 2e-5
 ```
 
+### Federated DP Training
+Run federated simulation with differential privacy:
+
+```bash
+python src/model/federated_dp/03_run_dp.py --model_name emilyalsentzer/Bio_ClinicalBERT --num_rounds 10 --num_clients 10 --epsilon 1.0
+python src/model/federated_dp/03_run_dp.py --model_name emilyalsentzer/Bio_ClinicalBERT --num_rounds 10 --num_clients 10 --epsilon 3.0
+python src/model/federated_dp/03_run_dp.py --model_name emilyalsentzer/Bio_ClinicalBERT --num_rounds 10 --num_clients 10 --epsilon 8.0
+```
+
 
 ## Structure
 ```
@@ -50,19 +53,28 @@ private-clinical-nlp/
 │   │       ├── checkpoints/
 │   │       ├── results.json  # best val metrics
 │   │       └── test_results.json  # test metrics
-│   └── federated/
+│   ├── federated/
+│   │   └── <model_slug>/
+│   │       ├── best_model/
+│   │       └── results.json  # metrics per round
+│   └── federated_dp/
 │       └── <model_slug>/
-│           ├── best_model/
-│           └── results.json  # metrics per round
+│           └── epsilon_<value>/
+│               ├── best_model/
+│               └── test_results.json
 └── src/
     └── model/
         ├── centralized/
         │   ├── 01_train.py
         │   └── 02_evaluate.py
-        └── federated/
-            ├── 01_client.py
-            ├── 02_server.py
-            └── 03_run.py
+        ├── federated/
+        │   ├── 01_client.py
+        │   ├── 02_server.py
+        │   └── 03_run.py
+        └── federated_dp/
+            ├── 01_client_dp.py
+            ├── 02_server_dp.py
+            └── 03_run_dp.py
 ```
 
 
@@ -73,3 +85,6 @@ private-clinical-nlp/
 | Centralized BERT-base | 0.5491 | 0.6756 | 0.6518 | 0.6893 | 0.7468 | 0.4981 | 0.6168 | 0.1876 | 0.8104 |
 | Centralized Bio_ClinicalBERT | 0.5641 | 0.6779 | 0.6550 | 0.7464 | 0.7531 | 0.5059 | 0.6163 | 0.1855 | 0.8169 |
 | Federated Bio_ClinicalBERT | 0.5271 | 0.6669 | 0.6364 | 0.6998 | 0.7564 | 0.4719 | 0.5964 | 0.1886 | 0.8077 |
+| Federated DP Bio_ClinicalBERT (e=1.0) | 0.2670 | 0.3899 | 0.3172 | 0.2292 | 0.3130 | 0.5252 | 0.5170 | 0.5123 | 0.5077 |
+| Federated DP Bio_ClinicalBERT (e=3.0) | 0.2442 | 0.3911 | 0.3011 | 0.2292 | 0.3370 | 0.4377 | 0.4658 | 0.4594 | 0.5088 |
+| Federated DP Bio_ClinicalBERT (e=8.0) | 0.2256 | 0.3883 | 0.2873 | 0.2327 | 0.3472 | 0.4031 | 0.4405 | 0.4394 | 0.5097 |
