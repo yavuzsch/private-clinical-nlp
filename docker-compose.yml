@@ -1,0 +1,331 @@
+services:
+  central:
+    build:
+      context: .
+      dockerfile: src/app/backend/central/Dockerfile
+    container_name: central
+    ports:
+      - "8000:8000"
+    environment:
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  hospital_0:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_0
+    ports:
+      - "8100:8100"
+    environment:
+      - HOSPITAL_ID=0
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_0_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      central:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_1:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_1
+    ports:
+      - "8101:8101"
+    environment:
+      - HOSPITAL_ID=1
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_1_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_0:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_2:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_2
+    ports:
+      - "8102:8102"
+    environment:
+      - HOSPITAL_ID=2
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_2_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_1:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_3:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_3
+    ports:
+      - "8103:8103"
+    environment:
+      - HOSPITAL_ID=3
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_3_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_2:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_4:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_4
+    ports:
+      - "8104:8104"
+    environment:
+      - HOSPITAL_ID=4
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_4_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_3:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_5:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_5
+    ports:
+      - "8105:8105"
+    environment:
+      - HOSPITAL_ID=5
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_5_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_4:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8105/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_6:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_6
+    ports:
+      - "8106:8106"
+    environment:
+      - HOSPITAL_ID=6
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_6_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_5:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8106/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_7:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_7
+    ports:
+      - "8107:8107"
+    environment:
+      - HOSPITAL_ID=7
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_7_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_6:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8107/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_8:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_8
+    ports:
+      - "8108:8108"
+    environment:
+      - HOSPITAL_ID=8
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_8_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_7:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  hospital_9:
+    build:
+      context: .
+      dockerfile: src/app/backend/hospital/Dockerfile
+    container_name: hospital_9
+    ports:
+      - "8109:8109"
+    environment:
+      - HOSPITAL_ID=9
+      - EPSILON=${EPSILON:-8.0}
+      - BASE_DIR=/app
+      - HOSPITAL_PASSWORD=${HOSPITAL_9_PASSWORD:-hospital}
+      - JWT_SECRET=${JWT_SECRET:-secret}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data:ro
+      - ./notes:/app/notes
+    depends_on:
+      hospital_8:
+        condition: service_healthy
+    networks:
+      - federated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8109/categories"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./src/app/frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    environment:
+      - NUM_HOSPITALS=10
+    networks:
+      - federated
+    depends_on:
+      hospital_9:
+        condition: service_healthy
+
+networks:
+  federated:
+    driver: bridge
