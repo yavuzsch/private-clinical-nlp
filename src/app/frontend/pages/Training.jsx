@@ -46,6 +46,8 @@ export default function Training() {
 
   useEffect(() => {
     fetchAll()
+    const interval = setInterval(fetchAll, 10000)
+    return () => clearInterval(interval)
   }, [])
 
   const fetchAll = async () => {
